@@ -1055,7 +1055,7 @@
                 
                 const size = (getColumnValue(row, 'Размер', 'размер') || '').toString().trim();
                 const weight = (getColumnValue(row, 'Вес', 'вес') || '').toString().trim();
-                const mesto = size && weight ? `${size} ${weight}` : (size || weight || '');
+                const osNumber = (getColumnValue(row, 'ОС', 'ос', 'Номер ОС', 'номер ос') || '').toString().trim();
                 
                 const commentParts = [recordType];
                 if (nameOriginal) commentParts.push(nameOriginal);
@@ -1069,7 +1069,7 @@
                     'Бренд': brand,
                     'ТЦ': '',
                     'Бренд/ТЦ': '',
-                    'Место': mesto,
+                    'Место': osNumber,
                     'Кол-во кор': getColumnValue(row, 'Кол-во', 'кол-во') || '',
                     'Последов-ть Бренда в ТС': '',
                     'Последов-ть внутри Бренда': '',
