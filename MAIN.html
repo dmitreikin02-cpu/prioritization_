@@ -1017,7 +1017,7 @@
                     'Кол-во кор': groupInfo.uniqueBoxes.size,
                     'Последов-ть Бренда в ТС': finalScheduleInfo.brandOrder,
                     'Последов-ть внутри Бренда': finalScheduleInfo.internalOrder,
-                    'Коммент.': ''
+                    'Коммент.': 'Текстиль'
                 });
             });
             
@@ -1044,17 +1044,24 @@
                     posmMap.get(storeNumber).set(brand, []);
                 }
                 
-                const name = (getColumnValue(row, 'Наименование', 'наименование') || '').toString().toLowerCase();
-                let comment = 'Оборудование';
-                if (name.includes('трансфер')) {
-                    comment = 'трансфер';
-                } else if (name.includes('posm')) {
-                    comment = 'POSM';
+                const nameOriginal = (getColumnValue(row, 'Наименование', 'наименование') || '').toString().trim();
+                const nameLower = nameOriginal.toLowerCase();
+                let recordType = 'Оборудование';
+                if (nameLower.includes('трансфер')) {
+                    recordType = 'Трансфер';
+                } else if (nameLower.includes('posm')) {
+                    recordType = 'POSM';
                 }
                 
                 const size = (getColumnValue(row, 'Размер', 'размер') || '').toString().trim();
                 const weight = (getColumnValue(row, 'Вес', 'вес') || '').toString().trim();
-                const mesto = size && weight ? `${size} ${weight}` : (size || weight || '');
+                const osNumber = (getColumnValue(row, 'ОС', 'ос', 'Номер ОС', 'номер ос') || '').toString().trim();
+                
+                const commentParts = [recordType];
+                if (nameOriginal) commentParts.push(nameOriginal);
+                if (size) commentParts.push(size);
+                if (weight) commentParts.push(weight);
+                const comment = commentParts.join(' ');
                 
                 posmMap.get(storeNumber).get(brand).push({
                     'Транспорт/№ заказа': getColumnValue(row, 'Рейс', 'рейс') || '',
@@ -1062,7 +1069,7 @@
                     'Бренд': brand,
                     'ТЦ': '',
                     'Бренд/ТЦ': '',
-                    'Место': mesto,
+                    'Место': osNumber,
                     'Кол-во кор': getColumnValue(row, 'Кол-во', 'кол-во') || '',
                     'Последов-ть Бренда в ТС': '',
                     'Последов-ть внутри Бренда': '',
