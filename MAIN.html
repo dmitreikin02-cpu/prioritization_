@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Приоритизация загрузки транспорта</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --primary: #00AEEF;
+            --secondary: #425563;
+            --accent-green: #A7C796;
+            --accent-blue: #B8DFEC;
+            --white: #ffffff;
+            --light-gray: #f5f5f5;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+            color: var(--secondary);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-green) 100%);
+            color: var(--white);
+            padding: 30px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 2.5em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px;
+        }
+        .file-upload-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .file-upload-box {
+            background: var(--accent-blue);
+            border: 3px dashed var(--primary);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .file-upload-box:hover {
+            background: rgba(184, 223, 236, 0.6);
+            border-color: var(--accent-green);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px rgba(0, 174, 239, 0.3);
+        }
+        .file-upload-box.dragover {
+            background: rgba(167, 199, 150, 0.3);
+            border-color: var(--accent-green);
+            transform: scale(1.02);
+        }
+        .file-upload-box.loaded {
+            background: rgba(167, 199, 150, 0.3);
+            border-color: var(--accent-green);
+            border-style: solid;
+        }
+        .file-upload-box input[type="file"] {
+            display: none;
+        }
+        .upload-icon {
+            font-size: 3em;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        .file-upload-box.loaded .upload-icon {
+            color: var(--accent-green);
+        }
+        .file-upload-box h3 {
+            color: var(--secondary);
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .file-upload-box p {
+            color: var(--secondary);
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        .file-name {
+            margin-top: 10px;
+            font-weight: 600;
+            color: var(--accent-green);
+            font-size: 0.9em;
+            word-break: break-word;
+        }
+        .optional-badge {
+            display: inline-block;
+            background: var(--accent-green);
+            color: var(--white);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            margin-left: 5px;
+            font-weight: 600;
+        }
+        .schedule-type-selector {
+            background: var(--light-gray);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .schedule-type-selector h4 {
+            color: var(--secondary);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .schedule-type-selector .type-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .schedule-type-selector .type-btn {
+            background: var(--white);
+            color: var(--secondary);
+            border: 2px solid var(--primary);
+            padding: 10px 25px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .schedule-type-selector .type-btn:hover {
+            background: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+        .schedule-type-selector .type-btn.active {
+            background: var(--primary);
+            color: var(--white);
+            box-shadow: 0 4px 15px rgba(0, 174, 239, 0.3);
+        }
+        .schedule-type-selector .detected-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: var(--secondary);
+            font-style: italic;
+        }
+        .buttons-section {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 15px 35px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 174, 239, 0.3);
+        }
+        button:hover {
+            background: #0099d6;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 174, 239, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        button.secondary {
+            background: var(--accent-green);
+        }
+        button.secondary:hover {
+            background: #95b585;
+        }
+        button.reset {
+            background: var(--secondary);
+        }
+        button.reset:hover {
+            background: #354251;
+        }
+        .stats {
+            background: var(--light-gray);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .stats h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-item {
+            background: var(--white);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid var(--accent-blue);
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: var(--secondary);
+            margin-top: 5px;
+        }
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--white);
+        }
+        thead {
+            background: var(--primary);
+            color: var(--white);
+            position: sticky;
+            top: 0;
+        }
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95em;
+            border-bottom: 2px solid var(--secondary);
+        }
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+        tbody tr:nth-child(even) {
+            background: var(--accent-blue);
+        }
+        tbody tr:hover {
+            background: rgba(0, 174, 239, 0.1);
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.9em;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--primary);
+        }
+        .loading-spinner {
+            border: 4px solid var(--accent-blue);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+        .message.success {
+            background: rgba(167, 199, 150, 0.3);
+            color: #2e7d32;
+            border-left: 4px solid var(--accent-green);
+        }
+        .message.info {
+            background: var(--accent-blue);
+            color: var(--secondary);
+            border-left: 4px solid var(--primary);
+        }
+        .hidden {
+            display: none;
+        }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+            header,
+            .file-upload-section,
+            .buttons-section,
+            .stats,
+            .schedule-type-selector,
+            button {
+                display: none !important;
+            }
+            .content {
+                padding: 20px;
+            }
+            .print-header {
+                display: block !important;
+                text-align: center;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid var(--secondary);
+            }
+            .print-header h2 {
+                font-size: 1.8em;
+                color: var(--secondary);
+            }
+            .table-container {
+                box-shadow: none;
+            }
+            table {
+                font-size: 10pt;
+            }
+            th, td {
+                padding: 8px;
+            }
+            tbody tr {
+                page-break-inside: avoid;
+            }
+            thead {
+                display: table-header-group;
+            }
+            @page {
+                size: landscape;
+                margin: 1cm;
+            }
+        }
+        .print-header {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            header h1 {
+                font-size: 1.8em;
+            }
+            .file-upload-section {
+                grid-template-columns: 1fr;
+            }
+            .buttons-section {
+                flex-direction: column;
+            }
+            button {
+                width: 100%;
+            }
+            table {
+                font-size: 0.8em;
+            }
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚚 Приоритизация загрузки транспорта</h1>
+            <p>Автоматизированная система обработки заказов и расчета приоритетов</p>
+        </header>
+ 
+        <div class="content">
+            <div class="file-upload-section">
+                <div class="file-upload-box" id="file1Box">
+                    <input type="file" id="file1" accept=".xlsx,.xls">
+                    <div class="upload-icon">📋</div>
+                    <h3>Отчёт по ОС на отгрузку</h3>
+                    <p>Загрузите основной файл с данными по заказам</p>
+                    <div class="file-name" id="file1Name"></div>
+                </div>
+ 
+                <div class="file-upload-box" id="file2Box">
+                    <input type="file" id="file2" accept=".xlsx,.xls,.xlsm">
+                    <div class="upload-icon">📅</div>
+                    <h3>Расписание</h3>
+                    <p>Загрузите файл с расписанием отгрузок</p>
+                    <div class="file-name" id="file2Name"></div>
+                </div>
+ 
+                <div class="file-upload-box" id="file3Box">
+                    <input type="file" id="file3" accept=".xlsx,.xls,.xlsm">
+                    <div class="upload-icon">📦</div>
+                    <h3>POSM <span class="optional-badge">Опционально</span></h3>
+                    <p>Загрузите файл с данными о последовательности</p>
+                    <div class="file-name" id="file3Name"></div>
+                </div>
+            </div>
+ 
+            <div id="scheduleTypeSelector" class="schedule-type-selector hidden">
+                <h4>⚙️ Выберите тип расписания</h4>
+                <div class="type-buttons">
+                    <button class="type-btn" id="typeMSC" onclick="setScheduleType('MSC')">🏢 МСК</button>
+                    <button class="type-btn" id="typeREG" onclick="setScheduleType('REG')">🌍 Регионы</button>
+                </div>
+                <div class="detected-info" id="detectedInfo">Выберите тип расписания перед обработкой</div>
+            </div>
+ 
+            <div class="buttons-section">
+                <button id="processBtn" disabled>Обработать данные</button>
+                <button id="downloadBtn" class="secondary" disabled>📥 Скачать Excel</button>
+                <button id="printBtn" class="secondary" disabled>🖨️ Печать таблицы</button>
+                <button id="resetBtn" class="reset">🔄 Сбросить</button>
+            </div>
+ 
+            <div id="messages"></div>
+            
+            <div id="statsSection" class="hidden stats">
+                <h3>📊 Статистика обработки</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTotal">0</div>
+                        <div class="stat-label">Всего записей</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statFiltered">0</div>
+                        <div class="stat-label">После фильтрации</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTransports">0</div>
+                        <div class="stat-label">Транспортных средств</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statBrands">0</div>
+                        <div class="stat-label">Брендов</div>
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="print-header">
+                <h2>Приоритизация загрузки транспорта</h2>
+                <p id="printDate"></p>
+            </div>
+ 
+            <div id="previewSection" class="hidden">
+                <h3 style="color: var(--primary); margin: 20px 0;">Предварительный просмотр результатов</h3>
+                <div class="table-container">
+                    <table id="previewTable">
+                        <thead>
+                            <tr>
+                                <th>Транспорт/№ заказа</th>
+                                <th>№ магазина</th>
+                                <th>Бренд/ТЦ</th>
+                                <th>Место</th>
+                                <th>Кол-во кор</th>
+                                <th>Последов-ть Бренда в ТС</th>
+                                <th>Последов-ть внутри Бренда</th>
+                                <th>Коммент.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        let file1Data = null;
+        let file2Data = null;
+        let file3Data = null;
+        let processedData = null;
+        let scheduleType = null; // 'MSC' or 'REG' - must be selected manually
+        
+        const BRAND_FILTERS = [
+            { keywords: ['VILET', 'ВИЛЕТ'], priority: 1 },
+            { keywords: ['DUB', 'ДАБ'], priority: 2 },
+            { keywords: ['ECRU', 'ЭКРЮ'], priority: 3 },
+            { keywords: ['MAAG', 'МААГ'], priority: 4 }
+        ];
+        const brandMapping = {
+            'МААГ': 'MAAG',
+            'МАAG': 'MAAG',
+            'MAAG': 'MAAG',
+            'ЭКРЮ': 'ECRU',
+            'ECRU': 'ECRU',
+            'ДАБ': 'DUB',
+            'DAB': 'DUB',
+            'DUB': 'DUB',
+            'ВИЛЕТ': 'VILET',
+            'VILET': 'VILET',
+            '12 STOREEZ': '12 STOREEZ',
+            '12STOREEZ': '12 STOREEZ'
+        };
+        function showMessage(text, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = text;
+            messagesDiv.appendChild(message);
+            setTimeout(() => message.remove(), 5000);
+        }
+        function setupFileUpload(boxId, inputId, fileNameId, fileNumber) {
+            const box = document.getElementById(boxId);
+            const input = document.getElementById(inputId);
+            const fileName = document.getElementById(fileNameId);
+            box.addEventListener('click', () => input.click());
+            box.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                box.classList.add('dragover');
+            });
+            box.addEventListener('dragleave', () => {
+                box.classList.remove('dragover');
+            });
+            box.addEventListener('drop', (e) => {
+                e.preventDefault();
+                box.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    input.files = files;
+                    handleFileUpload(files[0], fileNumber, fileName, box);
+                }
+            });
+            input.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0], fileNumber, fileName, box);
+                }
+            });
+        }
+        function handleFileUpload(file, fileNumber, fileNameElement, box) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    if (fileNumber === 1) {
+                        file1Data = jsonData;
+                    } else if (fileNumber === 2) {
+                        file2Data = jsonData;
+                        detectScheduleType(jsonData);
+                    } else if (fileNumber === 3) {
+                        file3Data = jsonData;
+                    }
+                    fileNameElement.textContent = `✓ ${file.name}`;
+                    box.classList.add('loaded');
+                    showMessage(`Файл "${file.name}" успешно загружен`, 'success');
+                    checkFilesReady();
+                } catch (error) {
+                    showMessage(`Ошибка при чтении файла "${file.name}": ${error.message}`, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        function detectScheduleType(scheduleData) {
+            // Simply show the selector - user must choose manually
+            document.getElementById('scheduleTypeSelector').classList.remove('hidden');
+            showMessage('Выберите тип расписания: МСК или Регионы', 'info');
+        }
+        function updateScheduleTypeInfo() {
+            const infoDiv = document.getElementById('detectedInfo');
+            
+            if (scheduleType === 'MSC') {
+                infoDiv.textContent = '✓ Выбрано: МСК (Москва)';
+            } else if (scheduleType === 'REG') {
+                infoDiv.textContent = '✓ Выбрано: Регионы';
+            } else {
+                infoDiv.textContent = 'Выберите тип расписания перед обработкой';
+            }
+        }
+        function updateScheduleTypeButtons() {
+            document.getElementById('typeMSC').classList.remove('active');
+            document.getElementById('typeREG').classList.remove('active');
+            if (scheduleType === 'MSC') {
+                document.getElementById('typeMSC').classList.add('active');
+            } else if (scheduleType === 'REG') {
+                document.getElementById('typeREG').classList.add('active');
+            }
+        }
+        function setScheduleType(type) {
+            scheduleType = type;
+            showMessage(`Тип расписания: ${type === 'MSC' ? 'МСК' : 'Регионы'}`, 'success');
+            
+            updateScheduleTypeInfo();
+            updateScheduleTypeButtons();
+        }
+        function checkFilesReady() {
+            const processBtn = document.getElementById('processBtn');
+            if (file1Data && file2Data) {
+                processBtn.disabled = false;
+            }
+        }
+        function normalizeColumnName(name) {
+            return String(name).trim().toLowerCase();
+        }
+        function findColumn(row, possibleNames) {
+            const normalizedRow = {};
+            Object.keys(row).forEach(key => {
+                normalizedRow[normalizeColumnName(key)] = row[key];
+            });
+            for (const name of possibleNames) {
+                const normalized = normalizeColumnName(name);
+                if (normalizedRow[normalized] !== undefined) {
+                    return row[Object.keys(row).find(k => normalizeColumnName(k) === normalized)];
+                }
+            }
+            return null;
+        }
+        function getColumnValue(row, ...possibleNames) {
+            return findColumn(row, possibleNames);
+        }
+        function filterFile1Data(data) {
+            return data.filter(row => {
+                const orderType = getColumnValue(row, 'Тип заказа', 'тип заказа');
+                const storeNumber = getColumnValue(row, 'Номер магазина', 'номер магазина');
+                if (orderType && String(orderType).toUpperCase().includes('MOP')) {
+                    return false;
+                }
+                if (orderType && String(orderType).toUpperCase().includes('POSM')) {
+                    return false;
+                }
+                if (storeNumber && /[а-яА-Яa-zA-Z]/.test(String(storeNumber))) {
+                    return false;
+                }
+                return true;
+            });
+        }
+        function normalizeBrand(brandName) {
+            if (!brandName) return '';
+            
+            const firstWord = brandName.toString().trim().split(/[\s\/]/)[0].toUpperCase();
+            
+            return brandMapping[firstWord] || firstWord;
+        }
+        // =============== MSC LOGIC ===============
+        function getDayOfWeekFromDate(dateValue) {
+            if (!dateValue) return null;
+            
+            let date;
+            if (dateValue instanceof Date) {
+                date = dateValue;
+            } else if (typeof dateValue === 'number') {
+                date = new Date((dateValue - 25569) * 86400 * 1000);
+            } else if (typeof dateValue === 'string') {
+                date = new Date(dateValue);
+            } else {
+                return null;
+            }
+            
+            if (isNaN(date.getTime())) return null;
+            
+            const dayOfWeek = date.getDay();
+            return dayOfWeek === 0 ? 7 : dayOfWeek;
+        }
+        function getBrandSequence(brandName) {
+            const brandStr = String(brandName || '').toUpperCase();
+            
+            if (brandStr.includes('ВИЛЕТ') || brandStr.includes('VILET')) {
+                return 1;
+            }
+            if (brandStr.includes('ЭКРЮ') || brandStr.includes('ECRU')) {
+                return 3;
+            }
+            if (brandStr.includes('ДАБ') || brandStr.includes('DUB')) {
+                return 2;
+            }
+            if (brandStr.includes('МААГ') || brandStr.includes('MAAG')) {
+                return 4;
+            }
+            
+            return 999;
+        }
+        function getInternalSequence(flightNumber, file3Data) {
+            if (!file3Data) {
+                return undefined;
+            }
+            const posmRecord = file3Data.find(row => {
+                const raceNumber = getColumnValue(row, 'Рейс', 'рейс', 'Трак', 'трак');
+                return String(raceNumber) === String(flightNumber);
+            });
+            if (!posmRecord) {
+                return undefined;
+            }
+            const sequence = getColumnValue(posmRecord, 'Последовательность', 'последовательность');
+            if (sequence && !isNaN(parseInt(sequence))) {
+                return parseInt(sequence);
+            }
+            const name = getColumnValue(posmRecord, 'Наименование', 'наименование');
+            if (name) {
+                const nameStr = String(name).toUpperCase();
+                
+                if (nameStr.includes('POSM') || nameStr.includes('ПОСМ')) {
+                    return 6;
+                }
+                if (nameStr.includes('ТРАНСФЕР') || nameStr.includes('TRANSFER')) {
+                    return 5;
+                }
+                return 7;
+            }
+            return undefined;
+        }
+        function getComment(orderNumber, file3Data) {
+            if (!file3Data) return '';
+            const posmRecord = file3Data.find(row => {
+                const osNumber = getColumnValue(row, 'Номер ОС', 'номер ос');
+                return String(osNumber) === String(orderNumber);
+            });
+            if (posmRecord) {
+                const comment = getColumnValue(posmRecord, 'Коммент.', 'коммент', 'комментарий');
+                return comment || '';
+            }
+            return '';
+        }
+        function getInternalSequenceText(sequence) {
+            if (sequence === undefined || sequence === 1) {
+                return 'Текстиль';
+            }
+            if (sequence === 2 || sequence === 5) {
+                return 'Трансфер';
+            }
+            if (sequence === 3 || sequence === 6) {
+                return 'POSM';
+            }
+            if (sequence === 4 || sequence === 7) {
+                return 'Оборудование';
+            }
+            return String(sequence);
+        }
+        function getBrandFilterPriority(brandName) {
+            const brandStr = String(brandName || '').toUpperCase();
+            
+            for (const filter of BRAND_FILTERS) {
+                for (const keyword of filter.keywords) {
+                    if (brandStr.includes(keyword.toUpperCase())) {
+                        return filter.priority;
+                    }
+                }
+            }
+            
+            return 999;
+        }
+        function processDataMSC(filteredData) {
+            const palletMap = new Map();
+            
+            filteredData.forEach(row => {
+                const orderNumber = getColumnValue(row, 'Номер заказа', 'номер заказа');
+                const storeNumber = getColumnValue(row, 'Номер магазина', 'номер магазина');
+                const direction = getColumnValue(row, 'Направление', 'направление');
+                const flightNumber = getColumnValue(row, 'Номер рейса', 'номер рейса');
+                const place = getColumnValue(row, 'Место', 'место');
+                const pallet = getColumnValue(row, 'Паллет', 'паллет');
+                const box = getColumnValue(row, 'Короб', 'короб');
+                const dispatchDate = getColumnValue(row, 'Дата отгрузки', 'дата отгрузки');
+                let palletKey;
+                if (!pallet || String(pallet).trim() === '') {
+                    if (place && String(place).trim() !== '') {
+                        palletKey = `PLACE_${place}_${orderNumber}`;
+                    } else {
+                        palletKey = `EMPTY_${orderNumber}_${Math.random()}`;
+                    }
+                } else {
+                    palletKey = `PALLET_${pallet}`;
+                }
+                
+                if (!palletMap.has(palletKey)) {
+                    palletMap.set(palletKey, {
+                        row: row,
+                        boxes: new Set(),
+                        orderNumber: orderNumber,
+                        storeNumber: storeNumber,
+                        direction: direction,
+                        flightNumber: flightNumber,
+                        place: place,
+                        pallet: pallet,
+                        dispatchDate: dispatchDate
+                    });
+                }
+                
+                if (box) {
+                    palletMap.get(palletKey).boxes.add(String(box));
+                }
+            });
+            const result = Array.from(palletMap.values()).map(palletData => {
+                const orderNumber = palletData.orderNumber;
+                const storeNumber = palletData.storeNumber;
+                const direction = palletData.direction;
+                const flightNumber = palletData.flightNumber;
+                const place = palletData.place;
+                const boxesCount = palletData.boxes.size;
+                const brandSequence = getBrandSequence(direction);
+                const comment = getComment(orderNumber, file3Data);
+                const brandFilterPriority = getBrandFilterPriority(direction);
+                return {
+                    transport: flightNumber || '',
+                    storeNumber: storeNumber || '',
+                    brand: direction || '',
+                    place: place || '',
+                    quantity: boxesCount,
+                    brandSequence: brandSequence,
+                    internalSequence: 1,
+                    internalSequenceText: 'Текстиль',
+                    comment: comment,
+                    brandFilterPriority: brandFilterPriority,
+                    source: 'REPORT'
+                };
+            });
+            if (file3Data && file3Data.length > 0) {
+                file3Data.forEach(posmRow => {
+                    const raceNumber = getColumnValue(posmRow, 'Рейс', 'рейс', 'Трак', 'трак');
+                    const storeNumber = getColumnValue(posmRow, 'магазин', 'Магазин', 'STORE N', 'store n');
+                    const brandName = getColumnValue(posmRow, 'Бренд', 'бренд', 'BRAND', 'brand');
+                    const regionDelivery = getColumnValue(posmRow, 'Регион доставки', 'регион доставки');
+                    const sequence = getColumnValue(posmRow, 'Последовательность', 'последовательность');
+                    const name = getColumnValue(posmRow, 'Наименование', 'наименование');
+                    const size = getColumnValue(posmRow, 'Размер', 'размер');
+                    const weight = getColumnValue(posmRow, 'Вес', 'вес');
+                    if (!raceNumber) return;
+                    let internalSequence = 4;
+                    if (sequence && !isNaN(parseInt(sequence))) {
+                        internalSequence = parseInt(sequence);
+                    } else if (name) {
+                        const nameStr = String(name).toUpperCase();
+                        if (nameStr.includes('POSM') || nameStr.includes('ПОСМ')) {
+                            internalSequence = 3;
+                        } else if (nameStr.includes('ТРАНСФЕР') || nameStr.includes('TRANSFER')) {
+                            internalSequence = 2;
+                        }
+                    }
+                    let commentParts = [];
+                    if (name) commentParts.push(String(name));
+                    if (size) commentParts.push(String(size));
+                    if (weight) commentParts.push(String(weight));
+                    const posmComment = commentParts.join(' ');
+                    const brandSequence = getBrandSequence(brandName || regionDelivery);
+                    const brandFilterPriority = getBrandFilterPriority(brandName || regionDelivery);
+                    result.push({
+                        transport: raceNumber || '',
+                        storeNumber: storeNumber || '',
+                        brand: `${brandName || regionDelivery || ''} POSM`,
+                        place: '',
+                        quantity: 1,
+                        brandSequence: brandSequence,
+                        internalSequence: internalSequence,
+                        internalSequenceText: getInternalSequenceText(internalSequence),
+                        comment: posmComment,
+                        brandFilterPriority: brandFilterPriority,
+                        source: 'POSM'
+                    });
+                });
+            }
+            result.sort((a, b) => {
+                if (a.transport !== b.transport) {
+                    return String(a.transport).localeCompare(String(b.transport));
+                }
+                
+                const seqA = a.brandSequence ?? 999;
+                const seqB = b.brandSequence ?? 999;
+                if (seqA !== seqB) {
+                    return seqA - seqB;
+                }
+                
+                const internalA = a.internalSequence ?? 999;
+                const internalB = b.internalSequence ?? 999;
+                return internalA - internalB;
+            });
+            let currentTransport = null;
+            let brandSequenceMap = new Map();
+            let sequenceCounter = 0;
+            
+            result.forEach(row => {
+                if (row.transport !== currentTransport) {
+                    currentTransport = row.transport;
+                    brandSequenceMap = new Map();
+                    sequenceCounter = 0;
+                }
+                
+                if (!brandSequenceMap.has(row.brandSequence)) {
+                    sequenceCounter++;
+                    brandSequenceMap.set(row.brandSequence, sequenceCounter);
+                }
+                
+                row.displayBrandSequence = brandSequenceMap.get(row.brandSequence);
+            });
+            return result;
+        }
+        // =============== REG LOGIC ===============
+        function filterSchedule(data) {
+            return data.filter(row => {
+                const tempCancel = (getColumnValue(row, 'ВРЕМЕННАЯ ОТМЕНА', 'временная отмена') || '').toString().toUpperCase();
+                return tempCancel !== 'X';
+            });
+        }
+        function enrichWithSchedule(reportData, scheduleData) {
+            const scheduleMap = new Map();
+            
+            scheduleData.forEach(row => {
+                const brand = normalizeBrand(getColumnValue(row, 'Бренд', 'бренд') || '');
+                const storeNumber = (getColumnValue(row, 'Номер магазина', 'номер магазина') || '').toString().trim();
+                
+                if (!storeNumber || !brand) return;
+                
+                const tc = getColumnValue(row, 'ТЦ', 'тц') || '';
+                const brandOrder = getColumnValue(row, 'Последов-ть загрузки ТЦ', 'последов-ть загрузки тц', 
+                                                       'Последовательность загрузки ТЦ', 'последовательность загрузки тц') || '';
+                const internalOrder = getColumnValue(row, 'Последов-ть загрузки от кабины', 'последов-ть загрузки от кабины',
+                                                          'Последовательность загрузки от кабины', 'последовательность загрузки от кабины') || '';
+                
+                if (!scheduleMap.has(storeNumber)) {
+                    scheduleMap.set(storeNumber, new Map());
+                }
+                
+                scheduleMap.get(storeNumber).set(brand, {
+                    tc: tc,
+                    brandOrder: brandOrder,
+                    internalOrder: internalOrder
+                });
+            });
+            
+            const groupedData = new Map();
+            
+            reportData.forEach(row => {
+                const brand = (getColumnValue(row, 'Направление', 'направление') || '').toString().trim();
+                const storeNumber = (getColumnValue(row, 'Номер магазина', 'номер магазина') || '').toString().trim();
+                const transport = getColumnValue(row, 'Номер рейса', 'номер рейса') || '';
+                const mesto = getColumnValue(row, 'Место', 'место') || '';
+                const korobNum = (getColumnValue(row, 'Короб', 'короб') || '').toString().trim();
+                
+                const groupKey = `${transport}_${storeNumber}_${brand}_${mesto}`;
+                
+                if (!groupedData.has(groupKey)) {
+                    groupedData.set(groupKey, {
+                        transport: transport,
+                        storeNumber: storeNumber,
+                        brand: brand,
+                        mesto: mesto,
+                        uniqueBoxes: new Set()
+                    });
+                }
+                
+                if (korobNum) {
+                    groupedData.get(groupKey).uniqueBoxes.add(korobNum);
+                }
+            });
+            
+            const enrichedData = [];
+            
+            groupedData.forEach((groupInfo) => {
+                const normalizedBrand = normalizeBrand(groupInfo.brand);
+                const storeNumber = groupInfo.storeNumber;
+                
+                const storeSchedule = scheduleMap.get(storeNumber);
+                let scheduleInfo = null;
+                
+                if (storeSchedule) {
+                    scheduleInfo = storeSchedule.get(normalizedBrand);
+                }
+                
+                const finalScheduleInfo = scheduleInfo || {
+                    tc: '',
+                    brandOrder: '',
+                    internalOrder: ''
+                };
+                
+                enrichedData.push({
+                    'Транспорт/№ заказа': groupInfo.transport,
+                    '№ магазина': groupInfo.storeNumber,
+                    'Бренд': normalizedBrand,
+                    'ТЦ': finalScheduleInfo.tc,
+                    'Бренд/ТЦ': finalScheduleInfo.tc ? `${normalizedBrand} / ${finalScheduleInfo.tc}` : normalizedBrand,
+                    'Место': groupInfo.mesto,
+                    'Кол-во кор': groupInfo.uniqueBoxes.size,
+                    'Последов-ть Бренда в ТС': finalScheduleInfo.brandOrder,
+                    'Последов-ть внутри Бренда': finalScheduleInfo.internalOrder,
+                    'Коммент.': ''
+                });
+            });
+            
+            return enrichedData;
+        }
+        function addPOSMRows(data, posmData) {
+            if (!posmData || posmData.length === 0) {
+                return data;
+            }
+            
+            const posmMap = new Map();
+            
+            posmData.forEach(row => {
+                const brand = normalizeBrand(getColumnValue(row, 'Бренд', 'бренд') || '');
+                const storeNumber = (getColumnValue(row, 'магазин', 'Магазин') || '').toString().trim();
+                
+                if (!storeNumber || !brand) return;
+                
+                if (!posmMap.has(storeNumber)) {
+                    posmMap.set(storeNumber, new Map());
+                }
+                
+                if (!posmMap.get(storeNumber).has(brand)) {
+                    posmMap.get(storeNumber).set(brand, []);
+                }
+                
+                const name = (getColumnValue(row, 'Наименование', 'наименование') || '').toString().toLowerCase();
+                let comment = 'Оборудование';
+                if (name.includes('трансфер')) {
+                    comment = 'трансфер';
+                } else if (name.includes('posm')) {
+                    comment = 'POSM';
+                }
+                
+                const size = (getColumnValue(row, 'Размер', 'размер') || '').toString().trim();
+                const weight = (getColumnValue(row, 'Вес', 'вес') || '').toString().trim();
+                const mesto = size && weight ? `${size} ${weight}` : (size || weight || '');
+                
+                posmMap.get(storeNumber).get(brand).push({
+                    'Транспорт/№ заказа': getColumnValue(row, 'Рейс', 'рейс') || '',
+                    '№ магазина': storeNumber,
+                    'Бренд': brand,
+                    'ТЦ': '',
+                    'Бренд/ТЦ': '',
+                    'Место': mesto,
+                    'Кол-во кор': getColumnValue(row, 'Кол-во', 'кол-во') || '',
+                    'Последов-ть Бренда в ТС': '',
+                    'Последов-ть внутри Бренда': '',
+                    'Коммент.': comment
+                });
+            });
+            
+            const result = [];
+            
+            data.forEach(row => {
+                result.push(row);
+                
+                const brand = row['Бренд'];
+                const storeNumber = row['№ магазина'].toString();
+                
+                const storePOSM = posmMap.get(storeNumber);
+                
+                if (storePOSM) {
+                    const brandPOSM = storePOSM.get(brand);
+                    
+                    if (brandPOSM) {
+                        brandPOSM.forEach(posmRow => {
+                            posmRow['Последов-ть Бренда в ТС'] = row['Последов-ть Бренда в ТС'];
+                            posmRow['Последов-ть внутри Бренда'] = row['Последов-ть внутри Бренда'];
+                            posmRow['Бренд/ТЦ'] = row['Бренд/ТЦ'];
+                            result.push(posmRow);
+                        });
+                        storePOSM.delete(brand);
+                    }
+                }
+            });
+            
+            return result;
+        }
+        function sortFinalDataREG(data) {
+            const commentOrder = {
+                '': 0,
+                'трансфер': 1,
+                'POSM': 2,
+                'Оборудование': 3
+            };
+            
+            return data.sort((a, b) => {
+                const brandOrderA = parseFloat(a['Последов-ть Бренда в ТС']) || 999999;
+                const brandOrderB = parseFloat(b['Последов-ть Бренда в ТС']) || 999999;
+                if (brandOrderA !== brandOrderB) {
+                    return brandOrderA - brandOrderB;
+                }
+                
+                const internalOrderA = parseFloat(a['Последов-ть внутри Бренда']) || 999999;
+                const internalOrderB = parseFloat(b['Последов-ть внутри Бренда']) || 999999;
+                if (internalOrderA !== internalOrderB) {
+                    return internalOrderA - internalOrderB;
+                }
+                
+                const storeA = parseInt(a['№ магазина']) || 0;
+                const storeB = parseInt(b['№ магазина']) || 0;
+                if (storeA !== storeB) {
+                    return storeA - storeB;
+                }
+                
+                if (a['Бренд/ТЦ'] === b['Бренд/ТЦ']) {
+                    const commentA = commentOrder[a['Коммент.']] !== undefined ? commentOrder[a['Коммент.']] : 999;
+                    const commentB = commentOrder[b['Коммент.']] !== undefined ? commentOrder[b['Коммент.']] : 999;
+                    return commentA - commentB;
+                }
+                
+                return 0;
+            });
+        }
+        function processDataREG(filteredReport) {
+            const filteredSchedule = filterSchedule(file2Data);
+            
+            let enrichedData = enrichWithSchedule(filteredReport, filteredSchedule);
+            
+            if (file3Data && file3Data.length > 0) {
+                enrichedData = addPOSMRows(enrichedData, file3Data);
+            }
+            
+            const sortedData = sortFinalDataREG(enrichedData);
+            
+            // Convert REG format to MSC display format
+            return sortedData.map(row => ({
+                transport: row['Транспорт/№ заказа'],
+                storeNumber: row['№ магазина'],
+                brand: row['Бренд/ТЦ'],
+                place: row['Место'],
+                quantity: row['Кол-во кор'],
+                displayBrandSequence: row['Последов-ть Бренда в ТС'],
+                internalSequenceText: row['Последов-ть внутри Бренда'],
+                comment: row['Коммент.']
+            }));
+        }
+        // =============== MAIN PROCESSING ===============
+        function processData() {
+            if (!file1Data || !file2Data) {
+                showMessage('Необходимо загрузить обязательные файлы', 'error');
+                return;
+            }
+            if (!scheduleType) {
+                showMessage('Выберите тип расписания (МСК или Регионы)', 'error');
+                return;
+            }
+            try {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'loading';
+                loadingDiv.innerHTML = '<div class="loading-spinner"></div><p>Обработка данных...</p>';
+                document.querySelector('.content').appendChild(loadingDiv);
+                setTimeout(() => {
+                    try {
+                        const filteredData = filterFile1Data(file1Data);
+                        
+                        let result;
+                        if (scheduleType === 'MSC') {
+                            result = processDataMSC(filteredData);
+                        } else {
+                            result = processDataREG(filteredData);
+                        }
+                        processedData = result;
+                        const transports = new Set(result.map(r => r.transport));
+                        const brands = new Set(result.map(r => r.brand));
+                        document.getElementById('statTotal').textContent = file1Data.length;
+                        document.getElementById('statFiltered').textContent = filteredData.length;
+                        document.getElementById('statTransports').textContent = transports.size;
+                        document.getElementById('statBrands').textContent = brands.size;
+                        document.getElementById('statsSection').classList.remove('hidden');
+                        displayPreview(result);
+                        document.getElementById('downloadBtn').disabled = false;
+                        document.getElementById('printBtn').disabled = false;
+                        loadingDiv.remove();
+                        showMessage('Данные успешно обработаны!', 'success');
+                    } catch (error) {
+                        loadingDiv.remove();
+                        showMessage(`Ошибка при обработке данных: ${error.message}`, 'error');
+                        console.error(error);
+                    }
+                }, 100);
+            } catch (error) {
+                showMessage(`Ошибка: ${error.message}`, 'error');
+            }
+        }
+        function displayPreview(data) {
+            const tbody = document.getElementById('previewBody');
+            tbody.innerHTML = '';
+            const displayData = data.slice(0, 100);
+            displayData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.transport}</td>
+                    <td>${row.storeNumber}</td>
+                    <td>${row.brand}</td>
+                    <td>${row.place}</td>
+                    <td>${row.quantity}</td>
+                    <td>${row.displayBrandSequence}</td>
+                    <td>${row.internalSequenceText}</td>
+                    <td>${row.comment}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (data.length > 100) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="8" style="text-align: center; font-style: italic; color: var(--secondary);">
+                    ... и еще ${data.length - 100} записей (будут включены в Excel файл)
+                </td>`;
+                tbody.appendChild(tr);
+            }
+            document.getElementById('previewSection').classList.remove('hidden');
+        }
+        function downloadExcel() {
+            if (!processedData || processedData.length === 0) {
+                showMessage('Нет данных для экспорта', 'error');
+                return;
+            }
+            try {
+                const exportData = processedData.map(row => ({
+                    'Транспорт/№ заказа': row.transport,
+                    '№ магазина': row.storeNumber,
+                    'Бренд/ТЦ': row.brand,
+                    'Место': row.place,
+                    'Кол-во кор': row.quantity,
+                    'Последов-ть Бренда в ТС': row.displayBrandSequence,
+                    'Последов-ть внутри Бренда': row.internalSequenceText,
+                    'Коммент.': row.comment
+                }));
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const colWidths = [
+                    { wch: 20 },
+                    { wch: 15 },
+                    { wch: 25 },
+                    { wch: 15 },
+                    { wch: 12 },
+                    { wch: 22 },
+                    { wch: 22 },
+                    { wch: 30 }
+                ];
+                ws['!cols'] = colWidths;
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Приоритизация');
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                XLSX.writeFile(wb, `Приоритизация_загрузки_${timestamp}.xlsx`);
+                showMessage('Excel файл успешно скачан!', 'success');
+            } catch (error) {
+                showMessage(`Ошибка при создании Excel файла: ${error.message}`, 'error');
+            }
+        }
+        function printTable() {
+            const printDate = document.getElementById('printDate');
+            printDate.textContent = `Дата: ${new Date().toLocaleString('ru-RU')}`;
+            window.print();
+        }
+        function resetAll() {
+            file1Data = null;
+            file2Data = null;
+            file3Data = null;
+            processedData = null;
+            scheduleType = null;
+            document.getElementById('file1').value = '';
+            document.getElementById('file2').value = '';
+            document.getElementById('file3').value = '';
+            document.getElementById('file1Name').textContent = '';
+            document.getElementById('file2Name').textContent = '';
+            document.getElementById('file3Name').textContent = '';
+            document.getElementById('file1Box').classList.remove('loaded');
+            document.getElementById('file2Box').classList.remove('loaded');
+            document.getElementById('file3Box').classList.remove('loaded');
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('printBtn').disabled = true;
+            document.getElementById('statsSection').classList.add('hidden');
+            document.getElementById('previewSection').classList.add('hidden');
+            document.getElementById('scheduleTypeSelector').classList.add('hidden');
+            document.getElementById('messages').innerHTML = '';
+            // Reset selector buttons
+            document.getElementById('typeMSC').classList.remove('active');
+            document.getElementById('typeREG').classList.remove('active');
+            
+            // Reset info text
+            document.getElementById('detectedInfo').textContent = 'Выберите тип расписания перед обработкой';
+            showMessage('Все данные сброшены', 'info');
+        }
+        setupFileUpload('file1Box', 'file1', 'file1Name', 1);
+        setupFileUpload('file2Box', 'file2', 'file2Name', 2);
+        setupFileUpload('file3Box', 'file3', 'file3Name', 3);
+        document.getElementById('processBtn').addEventListener('click', processData);
+        document.getElementById('downloadBtn').addEventListener('click', downloadExcel);
+        document.getElementById('printBtn').addEventListener('click', printTable);
+        document.getElementById('resetBtn').addEventListener('click', resetAll);
+        showMessage('Загрузите файлы для начала работы', 'info');
+    </script>
+</body>
+</html>
